@@ -32,6 +32,7 @@ huggingface/
 
 # Virtual environments
 venv/
+.venv/
 env/
 ENV/
 env.bak/

@@ -8,6 +8,7 @@ Useful for testing the AI model and speech capabilities
 import os
 import sys
 import time
+import torch
 from datetime import datetime
 
 def print_header():
