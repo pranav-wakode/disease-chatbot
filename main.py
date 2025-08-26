@@ -253,72 +253,53 @@ class HealthAssistantApp:
             self.root.after(0, lambda: self.add_message("System", error_msg, "system"))
     
     def construct_prompt(self, user_query):
-        """Construct prompt for the BLOOMZ model"""
+        """Construct a concise, model-friendly prompt for BLOOMZ-560M."""
         if self.current_language == "English":
             disclaimer = "DISCLAIMER: I am an AI assistant, not a medical professional. This information is for general knowledge only. Please consult a qualified doctor for any health concerns."
-            prompt = f"""You are a helpful AI health assistant. A user has asked: '{user_query}'. 
-
-Provide a structured response about common health conditions. The response must strictly follow this format:
-
-**Disease Name:** [Identified Ailment]
-
-**Disclaimer:** {disclaimer}
-
-**Overview:** [A brief, simple 1-2 sentence explanation of the condition.]
-
-**Common Symptoms:**
-- Symptom 1
-- Symptom 2
-- Symptom 3
-
-**General Home Care & Guidance:** [Safe, general, non-prescriptive advice. E.g., "Rest," "Stay hydrated," "Warm salt water gargle."]
-
-**When to Consult a Doctor:** [Clear indicators for seeking professional help. E.g., "If symptoms persist for more than 5 days," "If you have a high fever," "If you experience difficulty breathing."]
-
-Focus on common, non-life-threatening conditions. For severe conditions, provide basic information and strongly advise seeing a doctor immediately."""
-        else:
+            prompt = (
+                f"{disclaimer}\n\n"
+                f"Provide a short, factual health overview about: '{user_query}'.\n"
+                f"Write 4-8 simple sentences. Cover briefly: what it is, common symptoms, general home care, and when to consult a doctor."
+            )
+        else:  # Marathi
             disclaimer = "अस्वीकरण: मी एक AI सहाय्यक आहे, वैद्यकीय व्यावसायिक नाही. ही माहिती केवळ सामान्य ज्ञानासाठी आहे. कृपया कोणत्याही आरोग्यविषयक समस्यांसाठी पात्र डॉक्टरांचा सल्ला घ्या."
-            prompt = f"""You are a helpful AI health assistant. A user has asked in Marathi: '{user_query}'. 
-
-Provide a structured response in Marathi for common health conditions. The response must strictly follow this format:
-
-**रोगाचे नाव:** [Identified Ailment]
-
-**अस्वीकरण:** {disclaimer}
-
-**सर्वसाधारण माहिती:** [A brief, simple 1-2 sentence explanation of the condition in Marathi.]
-
-**सामान्य लक्षणे:**
-- लक्षण 1
-- लक्षण 2
-- लक्षण 3
-
-**सामान्य घरगुती काळजी आणि मार्गदर्शन:** [Safe, general, non-prescriptive advice in Marathi.]
-
-**डॉक्टरांना कधी भेटावे:** [Clear indicators for seeking professional help in Marathi.]
-
-Focus on common, non-life-threatening conditions. For severe conditions, provide basic information and strongly advise seeing a doctor immediately."""
-        
+            prompt = (
+                f"{disclaimer}\n\n"
+                f"खालील विषयावर लहान, तथ्यात्मक माहिती द्या: '{user_query}'.\n"
+                f"४-८ सोपी वाक्ये लिहा: तो काय आहे, सामान्य लक्षणे, सामान्य घरगुती काळजी, आणि डॉक्टरांना कधी भेटावे."
+            )
         return prompt
     
     def generate_response(self, prompt):
         """Generate response using BLOOMZ model"""
         try:
-            inputs = self.tokenizer.encode(prompt, return_tensors="pt", max_length=512, truncation=True)
+            inputs = self.tokenizer.encode(prompt, return_tensors="pt", max_length=1024, truncation=True)
+            eos_id = self.tokenizer.eos_token_id
+            pad_id = eos_id
             
             with torch.no_grad():
                 outputs = self.model.generate(
                     inputs,
-                    max_length=1024,
+                    max_new_tokens=200,
+                    min_new_tokens=60,
                     num_return_sequences=1,
-                    temperature=0.7,
+                    temperature=0.8,
+                    top_p=0.9,
+                    top_k=50,
+                    repetition_penalty=1.15,
+                    no_repeat_ngram_size=3,
+                    num_beams=1,
+                    early_stopping=False,
                     do_sample=True,
-                    pad_token_id=self.tokenizer.eos_token_id
+                    eos_token_id=eos_id,
+                    pad_token_id=pad_id,
+                    use_cache=True
                 )
             
-            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            full_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
             
-            # Extract only the generated part (remove the input prompt)
+            # Strip the prompt prefix if it appears
+            response = full_text
             if response.startswith(prompt):
                 response = response[len(prompt):].strip()
             
@@ -328,38 +309,60 @@ Focus on common, non-life-threatening conditions. For severe conditions, provide
             raise Exception(f"Model inference error: {str(e)}")
     
     def parse_response(self, response):
-        """Parse and format the model response"""
-        # Clean up the response
-        response = response.strip()
-        
-        # If response is empty or too short, provide a default response
-        if len(response) < 50:
+        """Parse and format the model response.
+
+        - Trim whitespace
+        - Remove duplicated consecutive lines
+        - Ensure required section headings exist in order; if missing, try to infer and insert
+        - Collapse excessive blank lines
+        """
+        text = response.strip()
+        if not text:
             if self.current_language == "English":
-                return """**Disease Name:** General Health Inquiry
-
-**Disclaimer:** DISCLAIMER: I am an AI assistant, not a medical professional. This information is for general knowledge only. Please consult a qualified doctor for any health concerns.
-
-**Overview:** I understand you have a health-related question, but I need more specific information to provide helpful guidance.
-
-**Common Symptoms:** Please describe your symptoms in detail.
-
-**General Home Care & Guidance:** For general wellness, maintain a healthy lifestyle with proper diet, exercise, and rest.
-
-**When to Consult a Doctor:** If you have persistent symptoms, pain, or concerns about your health, please consult a healthcare professional."""
+                return "I'm sorry, I couldn't generate a specific response for that topic. Could you please try rephrasing your question?"
             else:
-                return """**रोगाचे नाव:** सामान्य आरोग्य विचारणा
+                return "माफ करा, मी त्या विषयासाठी विशिष्ट प्रतिसाद तयार करू शकलो नाही. तुम्ही कृपया तुमचा प्रश्न पुन्हा मांडण्याचा प्रयत्न करू शकाल का?"
 
-**अस्वीकरण:** अस्वीकरण: मी एक AI सहाय्यक आहे, वैद्यकीय व्यावसायिक नाही. ही माहिती केवळ सामान्य ज्ञानासाठी आहे. कृपया कोणत्याही आरोग्यविषयक समस्यांसाठी पात्र डॉक्टरांचा सल्ला घ्या.
+        # Normalize line endings and split
+        lines = [ln.rstrip() for ln in text.replace('\r\n', '\n').replace('\r', '\n').split('\n')]
 
-**सर्वसाधारण माहिती:** मला तुमच्या आरोग्याशी संबंधित प्रश्न समजतो, पण मदतकारक मार्गदर्शन देण्यासाठी मला अधिक विशिष्ट माहिती हवी आहे.
+        # Remove exact duplicate consecutive lines and obvious filler like single letters
+        cleaned = []
+        for ln in lines:
+            if cleaned and ln == cleaned[-1]:
+                continue
+            if len(ln.strip()) <= 1:
+                continue
+            cleaned.append(ln)
 
-**सामान्य लक्षणे:** कृपया तुमची लक्षणे तपशीलवार वर्णन करा.
+        text = '\n'.join(cleaned)
 
-**सामान्य घरगुती काळजी आणि मार्गदर्शन:** सामान्य आरोग्यासाठी, योग्य आहार, व्यायाम आणि विश्रांतीसह निरोगी जीवनशैली राखा.
+        # Ensure disclaimer is present; if missing, prepend it only
+        disclaimer_en = "DISCLAIMER: I am an AI assistant, not a medical professional. This information is for general knowledge only. Please consult a qualified doctor for any health concerns."
+        disclaimer_mr = "अस्वीकरण: मी एक AI सहाय्यक आहे, वैद्यकीय व्यावसायिक नाही. ही माहिती केवळ सामान्य ज्ञानासाठी आहे. कृपया कोणत्याही आरोग्यविषयक समस्यांसाठी पात्र डॉक्टरांचा सल्ला घ्या."
+        if self.current_language == "English":
+            if "DISCLAIMER:" not in text:
+                text = f"{disclaimer_en}\n\n" + text
+        else:
+            if "अस्वीकरण:" not in text:
+                text = f"{disclaimer_mr}\n\n" + text
 
-**डॉक्टरांना कधी भेटावे:** जर तुम्हाला सतत लक्षणे, वेदना किंवा तुमच्या आरोग्याबद्दल काळजी असेल तर कृपया आरोग्य सेवा व्यावसायिकांचा सल्ला घ्या."""
-        
-        return response
+        # Remove empty bullets and collapse multiple blank lines
+        final_lines = []
+        blank = 0
+        for ln in text.split('\n'):
+            # Drop bullets that are just '-' or '- '
+            if ln.strip() in {'-', '- ', '–', '—'}:
+                continue
+            if not ln.strip():
+                blank += 1
+                if blank > 1:
+                    continue
+            else:
+                blank = 0
+            final_lines.append(ln)
+
+        return '\n'.join(final_lines).strip()
     
     def generate_audio_response(self, text_response):
         """Generate audio from text response and play it"""
