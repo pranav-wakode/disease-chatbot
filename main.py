@@ -35,11 +35,18 @@ class HealthAssistantApp:
         self.tokenizer = None
         self.model_loaded = False
         
-        # Start model loading in background
-        threading.Thread(target=self.load_model, daemon=True).start()
-        
         self.setup_ui()
         self.setup_audio_thread()
+
+        # --- ADD THIS MISSING CODE FOR THE STATUS BAR ---
+        self.status_var = tk.StringVar()
+        self.status_var.set("Welcome! Ask a question or use the microphone.")
+        status_label = tk.Label(self.root, textvariable=self.status_var, bd=1, relief=tk.SUNKEN, anchor=tk.W, wraplength=580)
+        status_label.pack(side=tk.BOTTOM, fill=tk.X)
+        # --- END OF ADDED CODE ---
+
+        # Start model loading in background (after status bar is ready)
+        threading.Thread(target=self.load_model, daemon=True).start()
     
     def setup_ui(self):
         # Main frame
@@ -93,12 +100,6 @@ class HealthAssistantApp:
                                     bg='#e74c3c', fg='white', font=('Arial', 10, 'bold'),
                                     relief=tk.FLAT, padx=20, pady=5)
         self.speak_button.pack(side=tk.LEFT)
-        
-        # Status bar
-        self.status_var = tk.StringVar(value="Ready")
-        status_bar = tk.Label(main_frame, textvariable=self.status_var, 
-                            bg='#ecf0f1', fg='#7f8c8d', font=('Arial', 9))
-        status_bar.pack(fill=tk.X, pady=(10, 0))
         
         # Welcome message
         self.add_message("System", "Welcome to your AI Health & Wellness Assistant! Please select your preferred language and ask me about common health concerns. Remember, I provide general information only - always consult a doctor for medical advice.", "system")
