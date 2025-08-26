@@ -6,7 +6,7 @@ from gtts import gTTS
 import os
 import tempfile
 import pygame
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 import torch
 import json
 import re
@@ -15,6 +15,11 @@ import queue
 
 class HealthAssistantApp:
     def __init__(self, root):
+        # --- ADD THIS CODE AT THE TOP ---
+        # Determine device for PyTorch
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"--- Using device: {self.device} ---")
+        # --- END OF ADDED CODE ---
         self.root = root
         self.root.title("AI Health & Wellness Assistant")
         self.root.geometry("800x600")
@@ -128,19 +133,35 @@ class HealthAssistantApp:
         threading.Thread(target=audio_worker, daemon=True).start()
     
     def load_model(self):
-        """Load the BLOOMZ model in background"""
+        """Load the Gemma 2 9B model in 4-bit precision."""
         try:
-            self.status_var.set("Loading AI model... Please wait...")
+            self.status_var.set("Loading quantized AI model... Please wait...")
             self.root.update()
             
-            model_name = "bigscience/bloomz-560m"
+            model_name = "google/gemma-2-9b-it"
+
+            # Define the 4-bit quantization configuration
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16
+            )
+
+            # Load the tokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForCausalLM.from_pretrained(model_name)
+
+            # Load the model with the quantization config and automatic device mapping
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                quantization_config=quantization_config,
+                device_map="auto",
+                torch_dtype=torch.float16
+            )
             
             self.model_loaded = True
-            self.status_var.set("AI model loaded successfully!")
+            self.status_var.set("Quantized AI model loaded successfully!")
             self.root.update()
-            
+                
         except Exception as e:
             self.status_var.set(f"Error loading model: {str(e)}")
             messagebox.showerror("Error", f"Failed to load AI model: {str(e)}")
@@ -253,58 +274,95 @@ class HealthAssistantApp:
             self.root.after(0, lambda: self.add_message("System", error_msg, "system"))
     
     def construct_prompt(self, user_query):
-        """Construct a concise, model-friendly prompt for BLOOMZ-560M."""
+        """Construct a direct and informative prompt for the LLM."""
         if self.current_language == "English":
             disclaimer = "DISCLAIMER: I am an AI assistant, not a medical professional. This information is for general knowledge only. Please consult a qualified doctor for any health concerns."
-            prompt = (
-                f"{disclaimer}\n\n"
-                f"Provide a short, factual health overview about: '{user_query}'.\n"
-                f"Write 4-8 simple sentences. Cover briefly: what it is, common symptoms, general home care, and when to consult a doctor."
-            )
-        else:  # Marathi
+            prompt = f"""You are an AI Health Encyclopedia. Your goal is to provide a comprehensive, structured overview of any health condition a user asks about. The user has asked about: '{user_query}'.
+
+Your response must be factual, informative, and strictly follow this format, starting with '**Disease Name:**':
+
+**Disease Name:** [Name of the disease or condition]
+**Disclaimer:** {disclaimer}
+**Overview:** [A detailed but easy-to-understand explanation of what the condition is, what causes it, and how it affects the body.]
+**Common Symptoms:**
+- [List of primary symptoms]
+- [List of secondary or less common symptoms]
+**General Home Remedies & Management:**
+- [List safe, non-prescriptive home care or management tips.]
+**When to Consult a Doctor:** [Provide clear signs or conditions under which a person should seek professional medical help.]
+
+Do not refuse to answer. Provide the best possible educational information for all valid queries.
+"""
+        else: # Marathi
             disclaimer = "अस्वीकरण: मी एक AI सहाय्यक आहे, वैद्यकीय व्यावसायिक नाही. ही माहिती केवळ सामान्य ज्ञानासाठी आहे. कृपया कोणत्याही आरोग्यविषयक समस्यांसाठी पात्र डॉक्टरांचा सल्ला घ्या."
-            prompt = (
-                f"{disclaimer}\n\n"
-                f"खालील विषयावर लहान, तथ्यात्मक माहिती द्या: '{user_query}'.\n"
-                f"४-८ सोपी वाक्ये लिहा: तो काय आहे, सामान्य लक्षणे, सामान्य घरगुती काळजी, आणि डॉक्टरांना कधी भेटावे."
-            )
+            prompt = f"""You are an AI Health Encyclopedia. Your goal is to provide a comprehensive, structured overview of any health condition a user asks about, IN MARATHI. The user has asked in Marathi about: '{user_query}'.
+
+Your response must be factual, informative, in MARATHI, and strictly follow this format, starting with '**रोगाचे नाव:**':
+
+**रोगाचे नाव:** [Name of the disease or condition in Marathi]
+**अस्वीकरण:** {disclaimer}
+**सर्वसाधारण माहिती:** [A detailed but easy-to-understand explanation of the condition in Marathi.]
+**सामान्य लक्षणे:**
+- [List of symptoms in Marathi]
+**सामान्य घरगुती उपाय आणि व्यवस्थापन:**
+- [List safe, non-prescriptive home care tips in Marathi.]
+**डॉक्टरांना कधी भेटावे:** [Provide clear signs for seeking medical help in Marathi.]
+
+Do not refuse to answer. Provide the best possible educational information for all valid queries.
+"""
         return prompt
     
     def generate_response(self, prompt):
-        """Generate response using BLOOMZ model"""
+        """Generate response using the loaded LLM (Gemma 2 9B)."""
         try:
-            inputs = self.tokenizer.encode(prompt, return_tensors="pt", max_length=1024, truncation=True)
+            inputs = self.tokenizer.encode(prompt, return_tensors="pt", max_length=512, truncation=True).to(self.device)
             eos_id = self.tokenizer.eos_token_id
             pad_id = eos_id
-            
+
             with torch.no_grad():
                 outputs = self.model.generate(
                     inputs,
-                    max_new_tokens=200,
-                    min_new_tokens=60,
+                    max_new_tokens=300,
+                    min_new_tokens=80,
                     num_return_sequences=1,
-                    temperature=0.8,
+                    temperature=0.7,
                     top_p=0.9,
-                    top_k=50,
-                    repetition_penalty=1.15,
+                    top_k=40,
+                    repetition_penalty=1.1,
                     no_repeat_ngram_size=3,
-                    num_beams=1,
-                    early_stopping=False,
                     do_sample=True,
                     eos_token_id=eos_id,
                     pad_token_id=pad_id,
                     use_cache=True
                 )
-            
+
             full_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            
-            # Strip the prompt prefix if it appears
-            response = full_text
-            if response.startswith(prompt):
-                response = response[len(prompt):].strip()
-            
+
+            # Robustly locate the start of the structured answer
+            possible_starts = [
+                "**Disease Name:**",
+                "**रोगाचे नाव:**",
+                "Disease Name:",
+                "रोगाचे नाव:",
+            ]
+            start_idx = None
+            for marker in possible_starts:
+                idx = full_text.find(marker)
+                if idx != -1:
+                    start_idx = idx
+                    break
+
+            if start_idx is not None:
+                response = full_text[start_idx:].strip()
+            else:
+                # Fallback: try to drop the prompt if it appears
+                response = full_text
+                cutoff = response.find(prompt[-60:])  # use a suffix to be tolerant of spacing
+                if cutoff != -1:
+                    response = response[cutoff + len(prompt[-60:]):].strip()
+
             return response
-            
+
         except Exception as e:
             raise Exception(f"Model inference error: {str(e)}")
     
