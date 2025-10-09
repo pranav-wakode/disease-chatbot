@@ -1,6 +1,6 @@
 # AI Health & Wellness Assistant
 
-A comprehensive Python desktop application that provides AI-powered health information and guidance using the BLOOMZ-560M language model. The application supports both English and Marathi languages, with text and speech interaction capabilities.
+A comprehensive Python desktop application that provides AI-powered health information and guidance using the Large Language Model. The application supports both English and Marathi languages, with text and speech interaction capabilities.
 
 ## ⚠️ CRITICAL SAFETY DISCLAIMER
 
@@ -13,7 +13,7 @@ A comprehensive Python desktop application that provides AI-powered health infor
 
 ## 🚀 Features
 
-- **AI-Powered Health Information**: Uses the BLOOMZ-560M model for intelligent health guidance
+- **AI-Powered Health Information**: Uses the Large Language Model for intelligent health guidance
 - **Bilingual Support**: English and Marathi language support
 - **Multimodal Interaction**: Text input and speech recognition capabilities
 - **Text-to-Speech**: Audio playback of responses for accessibility
@@ -24,7 +24,6 @@ A comprehensive Python desktop application that provides AI-powered health infor
 ## 📋 Prerequisites
 
 - Python 3.8 or higher
-- Windows 10/11 (tested on Windows 10)
 - Microphone for speech input
 - Speakers/headphones for audio output
 - Internet connection (for initial model download and speech recognition)
@@ -33,8 +32,8 @@ A comprehensive Python desktop application that provides AI-powered health infor
 
 ### 1. Clone or Download the Project
 ```bash
-git clone <repository-url>
-cd disease_assistance
+git clone https://github.com/wakodepranav2005-git/disease_chatbot.git
+cd disease_chatbot
 ```
 
 ### 2. Install Python Dependencies
@@ -45,7 +44,7 @@ pip install -r requirements.txt
 **Note**: Some packages may require additional system dependencies:
 
 - **PyAudio**: If installation fails, you may need to install Microsoft Visual C++ Build Tools
-- **torch**: The first run will download the AI model (~1.1GB)
+- **torch**: The first run will download the AI model
 
 ### 3. Alternative Installation for PyAudio Issues
 If PyAudio installation fails on Windows, try:
@@ -58,7 +57,7 @@ pipwin install pyaudio
 
 ### Starting the Application
 ```bash
-python main.py
+python src/main.py
 ```
 
 ### Using the Application
@@ -102,81 +101,37 @@ Each AI response follows a structured format:
 
 ### Core Components
 - **GUI Framework**: Tkinter for cross-platform desktop interface
-- **AI Model**: Hugging Face Transformers with BLOOMZ-560M
+- **AI Model**: Hugging Face Transformers with desired model (compatible with English and Marathi)
 - **Speech Recognition**: Google Speech Recognition API
 - **Text-to-Speech**: Google Text-to-Speech (gTTS)
 - **Audio Playback**: Pygame for cross-platform audio support
 
-### Model Information
-- **Model**: bigscience/bloomz-560M
-- **Size**: ~1.1GB (downloaded automatically on first run)
-- **Capabilities**: Multilingual text generation with health domain knowledge
-- **Performance**: Optimized for local inference with reasonable response times
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Model Loading Errors**
-   - Ensure stable internet connection for initial download
-   - Check available disk space (minimum 2GB free)
-   - Restart application if download fails
-
-2. **Speech Recognition Issues**
-   - Check microphone permissions
-   - Ensure microphone is working in other applications
-   - Verify internet connection for Google Speech API
-
-3. **Audio Playback Problems**
-   - Check speaker/headphone connections
-   - Verify system audio settings
-   - Restart application if pygame initialization fails
-
-4. **PyAudio Installation Issues**
-   - Install Microsoft Visual C++ Build Tools
-   - Use pipwin: `pip install pipwin && pipwin install pyaudio`
-   - Try pre-compiled wheels from unofficial sources
-
-### Performance Optimization
-- First run may be slower due to model download
-- Subsequent runs will be faster with cached model
-- Speech recognition requires stable internet connection
-
 ## 📁 Project Structure
 
 ```
-disease_assistance/
-├── main.py              # Main application file
-├── requirements.txt     # Python dependencies
-├── README.md           # This file
-└── .gitignore          # Git ignore file
+disease_chatbot/
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── install_and_run.bat
+│
+├── src/
+│   ├── main.py
+│   └── config.py
+│
+└── scripts/
+    ├── check_gpu.py
+    ├── demo.py
+    ├── test_installation.py
+    └── test_llm.py
 ```
-
-## 🤝 Contributing
-
-This project is designed for educational and research purposes. Contributions should focus on:
-- Improving safety features
-- Enhancing user experience
-- Bug fixes and performance improvements
-- Additional language support
-
-## 📄 License
-
-This project is provided as-is for educational purposes. Users are responsible for understanding and following all safety guidelines.
 
 ## ⚡ Quick Start
 
 1. Install dependencies: `pip install -r requirements.txt`
-2. Run application: `python main.py`
+2. Run application: `python src/main.py`
 3. Select language and start asking health questions
 4. **Remember**: Always consult healthcare professionals for medical advice
-
-## 🔗 Additional Resources
-
-- [Hugging Face Transformers](https://huggingface.co/docs/transformers/)
-- [BLOOMZ Model Information](https://huggingface.co/bigscience/bloomz-560m)
-- [Speech Recognition Documentation](https://pypi.org/project/SpeechRecognition/)
-- [Google Text-to-Speech](https://pypi.org/project/gTTS/)
 
 ---
 
