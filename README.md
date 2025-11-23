@@ -32,7 +32,7 @@ A comprehensive Python desktop application that provides AI-powered health infor
 
 ### 1. Clone or Download the Project
 ```bash
-https://github.com/pranav-wakode/disease-chatbot.git
+git clone https://github.com/pranav-wakode/disease-chatbot.git
 cd disease-chatbot
 ```
 
