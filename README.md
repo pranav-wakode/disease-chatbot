@@ -32,8 +32,8 @@ A comprehensive Python desktop application that provides AI-powered health infor
 
 ### 1. Clone or Download the Project
 ```bash
-git clone https://github.com/wakodepranav2005-git/disease_chatbot.git
-cd disease_chatbot
+https://github.com/pranav-wakode/disease-chatbot.git
+cd disease-chatbot
 ```
 
 ### 2. Install Python Dependencies
@@ -109,7 +109,7 @@ Each AI response follows a structured format:
 ## 📁 Project Structure
 
 ```
-disease_chatbot/
+disease-chatbot/
 ├── .gitignore
 ├── README.md
 ├── requirements.txt
